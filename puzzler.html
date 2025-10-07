@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Quantum Puzzle — Stabilize the Flux Core</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg1: #0b0f1a;
+    --bg2: #10152a;
+    --accent: #00f7ff;
+    --accent2: #ff00e6;
+    --accent3: #8aff00;
+    --white: #e6ffff;
+    --warning: #ff3b3b;
+    --ok: #3bff6e;
+    --shadow-weak: 0 0 6px rgba(0, 255, 255, 0.45), 0 0 12px rgba(0, 255, 255, 0.25);
+    --shadow-strong: 0 0 12px rgba(0, 255, 255, 0.75), 0 0 24px rgba(0, 255, 255, 0.45), 0 0 48px rgba(0, 255, 255, 0.35);
+    --shadow-pink: 0 0 12px rgba(255, 0, 230, 0.75), 0 0 24px rgba(255, 0, 230, 0.45), 0 0 48px rgba(255, 0, 230, 0.35);
+    --shadow-green: 0 0 12px rgba(138, 255, 0, 0.75), 0 0 24px rgba(138, 255, 0, 0.45), 0 0 48px rgba(138, 255, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: radial-gradient(1200px 800px at 20% 20%, #11163a 0%, var(--bg2) 45%, var(--bg1) 100%);
+    color: var(--white); font-family: 'Orbitron', system-ui, sans-serif;
+  }
+
+  /* Glowing scanlines overlay */
+  .scanlines {
+    position: fixed; inset: 0; pointer-events: none; opacity: 0.15;
+    background-image: linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 100% 3px;
+    mix-blend-mode: screen; z-index: 1;
+  }
+
+  /* Top navigation + back button */
+  .topbar {
+    position: sticky; top: 0; z-index: 10; backdrop-filter: blur(6px);
+    background: rgba(10, 14, 26, 0.7); border-bottom: 1px solid rgba(0, 247, 255, 0.2);
+    display: flex; align-items: center; gap: 16px; padding: 12px 18px;
+  }
+  .back-btn {
+    font-family: 'Press Start 2P', monospace; font-size: 12px; letter-spacing: 1px;
+    color: var(--accent); border: 2px solid var(--accent); background: transparent;
+    padding: 8px 12px; cursor: pointer; text-shadow: 0 0 6px var(--accent);
+    box-shadow: var(--shadow-weak); transition: 0.18s ease; border-radius: 6px;
+  }
+  .back-btn:hover { background: rgba(0,247,255,0.12); box-shadow: var(--shadow-strong); }
+  .title {
+    font-family: 'Press Start 2P', monospace; font-size: 16px; flex: 1; text-align: center;
+    color: var(--white); text-shadow: var(--shadow-strong);
+  }
+
+  /* Shell layout */
+  .shell {
+    max-width: 980px; margin: 24px auto; padding: 0 16px; position: relative; z-index: 2;
+  }
+  .panel {
+    background: linear-gradient(180deg, rgba(18,24,44,0.75), rgba(12,16,30,0.75));
+    border: 1px solid rgba(0, 247, 255, 0.25); border-radius: 14px;
+    box-shadow: 0 0 64px rgba(0, 0, 0, 0.45), 0 0 32px rgba(0, 247, 255, 0.1);
+    overflow: hidden;
+  }
+
+  /* HUD */
+  .hud { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 16px; }
+  .hud-item {
+    border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 12px; background: rgba(255,255,255,0.02);
+  }
+  .hud-label { font-size: 12px; opacity: 0.75; margin-bottom: 6px; }
+  .hud-value { font-size: 18px; font-weight: 700; text-shadow: var(--shadow-weak); }
+
+  /* Main puzzle grid */
+  .stage {
+    padding: 24px; display: grid; grid-template-columns: 260px 1fr; gap: 16px; align-items: start;
+  }
+  .card {
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; background: rgba(255,255,255,0.02);
+  }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .btn {
+    font-family: 'Press Start 2P', monospace; font-size: 12px; letter-spacing: 1px;
+    color: var(--accent); border: 2px solid var(--accent); background: transparent;
+    padding: 10px 12px; cursor: pointer; text-shadow: 0 0 6px var(--accent);
+    box-shadow: var(--shadow-weak); transition: 0.18s ease; border-radius: 6px;
+  }
+  .btn:hover { background: rgba(0,247,255,0.12); box-shadow: var(--shadow-strong); }
+  .btn-pink { color: var(--accent2); border-color: var(--accent2); text-shadow: 0 0 6px var(--accent2); box-shadow: var(--shadow-pink); }
+  .btn-green { color: var(--accent3); border-color: var(--accent3); text-shadow: 0 0 6px var(--accent3); box-shadow: var(--shadow-green); }
+
+  /* Grid visual */
+  .grid-wrap { display: grid; place-items: center; padding: 8px; }
+  .grid {
+    display: grid; gap: 6px; padding: 10px; background: rgba(12,16,30,0.6);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+    box-shadow: 0 0 24px rgba(0, 247, 255, 0.12) inset;
+  }
+  .cell {
+    width: 52px; height: 52px; border-radius: 8px; cursor: pointer; position: relative; overflow: hidden;
+    transition: transform 100ms ease, box-shadow 120ms ease;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .cell::after {
+    content: ""; position: absolute; inset: 0; mix-blend-mode: screen; opacity: 0.6;
+    background: radial-gradient(30px 30px at 30% 30%, rgba(255,255,255,0.08), transparent 70%);
+  }
+  .cell.on  { background: linear-gradient(180deg, rgba(0,247,255,0.18), rgba(0,247,255,0.05)); box-shadow: var(--shadow-weak); }
+  .cell.off { background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)); }
+  .cell:active { transform: scale(0.96); }
+
+  /* Status + narrative */
+  .status { font-size: 13px; opacity: 0.85; }
+  .narrative { font-size: 13px; line-height: 1.6; opacity: 0.95; text-shadow: 0 0 8px rgba(255,255,255,0.12); }
+
+  /* Modal endgame */
+  .modal {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20;
+    background: rgba(6, 8, 16, 0.75); backdrop-filter: blur(6px);
+  }
+  .modal.open { display: flex; }
+  .modal-card {
+    width: min(860px, 92vw); background: linear-gradient(180deg, rgba(18,24,44,0.9), rgba(12,16,30,0.9));
+    border: 1px solid rgba(0, 247, 255, 0.25); border-radius: 16px; padding: 24px;
+    box-shadow: 0 0 64px rgba(0, 247, 255, 0.2);
+  }
+  .flux-core {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: center;
+  }
+  .core-visual {
+    height: 280px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
+    background:
+      radial-gradient(120px 120px at 50% 50%, rgba(0,247,255,0.5), transparent 70%),
+      radial-gradient(220px 220px at 50% 50%, rgba(255,0,230,0.25), transparent 70%),
+      conic-gradient(from 90deg, rgba(0,247,255,0.12), rgba(255,0,230,0.12), rgba(138,255,0,0.10), rgba(0,247,255,0.12));
+    box-shadow: 0 0 48px rgba(0, 247, 255, 0.22), inset 0 0 36px rgba(255, 0, 230, 0.16);
+    position: relative;
+    animation: pulse 2.8s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0% { filter: hue-rotate(0deg) brightness(1); }
+    50% { filter: hue-rotate(40deg) brightness(1.15); }
+    100% { filter: hue-rotate(0deg) brightness(1); }
+  }
+  .core-lines {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(transparent 48%, rgba(0,247,255,0.18) 50%, transparent 52%),
+      linear-gradient(90deg, transparent 48%, rgba(255,0,230,0.16) 50%, transparent 52%);
+    background-size: 100% 22px, 22px 100%;
+    opacity: 0.8;
+  }
+
+  /* Footer credits */
+  .credits {
+    margin: 18px auto; max-width: 980px; font-size: 12px; opacity: 0.75; text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+
+<div class="topbar">
+  <button class="back-btn" onclick="location.href='https://tealdragons78.github.io/NeonUI/'">BACK</button>
+  <div class="title">QUANTUM PUZZLE — Flux Core Stabilization Protocol</div>
+</div>
+
+<div class="shell panel">
+  <div class="hud">
+    <div class="hud-item">
+      <div class="hud-label">Phase</div>
+      <div id="hud-phase" class="hud-value">I</div>
+    </div>
+    <div class="hud-item">
+      <div class="hud-label">Puzzle</div>
+      <div id="hud-puzzle" class="hud-value">1 / 512</div>
+    </div>
+    <div class="hud-item">
+      <div class="hud-label">Moves</div>
+      <div id="hud-moves" class="hud-value">0</div>
+    </div>
+    <div class="hud-item">
+      <div class="hud-label">Flux</div>
+      <div id="hud-flux" class="hud-value">0%</div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="card">
+      <div class="status">
+        Objective: Toggle the quantum lattice to match the target signature. Neighbor-coupled flips propagate on each move. Stabilize sectors to advance.
+      </div>
+      <div class="actions">
+        <button class="btn" id="btn-prev">Prev</button>
+        <button class="btn" id="btn-next">Next</button>
+        <button class="btn-pink btn" id="btn-reset">Reset</button>
+        <button class="btn-green btn" id="btn-stabilize">Stabilize Flux</button>
+      </div>
+      <div class="actions">
+        <button class="btn" id="btn-size-5">Grid 5x5</button>
+        <button class="btn" id="btn-size-6">Grid 6x6</button>
+        <button class="btn" id="btn-size-7">Grid 7x7</button>
+        <button class="btn" id="btn-hint">Hint</button>
+      </div>
+    </div>
+
+    <div class="card grid-wrap">
+      <div id="grid" class="grid"></div>
+      <div style="margin-top: 12px; display:flex; gap:8px; align-items:center;">
+        <span>Target match:</span>
+        <div id="match-bar" style="flex:1; height:8px; border-radius:4px; background:rgba(255,255,255,0.08); overflow:hidden;">
+          <div id="match-fill" style="height:100%; width:0%; background:linear-gradient(90deg, #00f7ff, #ff00e6, #8aff00); box-shadow: var(--shadow-strong);"></div>
+        </div>
+        <span id="match-label">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin: 0 16px 16px;">
+    <div class="narrative" id="narrative">
+      Phase I: Wake. The lattice hums in cold neon. Each puzzle is a sector of the flux core, oscillating out of tune.
+      As you tune the grid, resonance threads tighten. When alignment crosses thresholds, the core stops fighting back—and starts listening.
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="endgame">
+  <div class="modal-card">
+    <h2 style="margin-top:0; font-family:'Press Start 2P', monospace; text-shadow: var(--shadow-strong);">
+      Flux Core Stabilization Achieved
+    </h2>
+    <div class="flux-core">
+      <div class="core-visual">
+        <div class="core-lines"></div>
+      </div>
+      <div>
+        <p class="narrative">
+          You’ve brought 512 lattice sectors into phase. The flux core’s chaotic potential collapses into a stable manifold.
+          Neon filaments braid into a single tone—clean, bright, resolved. The arcade stops flickering. The city exhales.
+        </p>
+        <div class="actions">
+          <button class="btn" onclick="location.href='https://tealdragons78.github.io/NeonUI/'">Return to NeonUI</button>
+          <button class="btn-green btn" onclick="location.reload()">Replay Sequence</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="credits">© Quantum Puzzle — Neon Arcade Initiative. Build: HTML + CSS + JavaScript. Designed for browsers with ES6 support.</div>
+
+<script>
+/*
+  Quantum Puzzle — Core Engine
+  - Puzzle type: Neighbor-coupled toggle lattice (LightsOut-inspired with twists).
+  - Grid sizes: 5x5, 6x6, 7x7.
+  - 512 procedurally generated puzzles across 4 phases (I–IV).
+  - Match metric: % alignment with target signature.
+  - Stabilization: Complete final sector and trigger flux core modal.
+*/
+
+const Game = (() => {
+  const state = {
+    phase: 1,
+    puzzleIndex: 1,
+    maxPuzzles: 512,
+    gridSize: 5,
+    moves: 0,
+    flux: 0, // percentage progress
+    grid: [],
+    target: [],
+    seed: 1337,
+  };
+
+  const hudPhase = document.getElementById('hud-phase');
+  const hudPuzzle = document.getElementById('hud-puzzle');
+  const hudMoves = document.getElementById('hud-moves');
+  const hudFlux = document.getElementById('hud-flux');
+  const gridEl = document.getElementById('grid');
+  const narrativeEl = document.getElementById('narrative');
+  const matchFill = document.getElementById('match-fill');
+  const matchLabel = document.getElementById('match-label');
+  const endgameModal = document.getElementById('endgame');
+
+  // Simple seeded PRNG
+  function rng(seed) {
+    let s = seed >>> 0;
+    return () => {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+  }
+
+  // Phase narrative
+  const lore = [
+    "Phase I: Wake. The lattice hums in cold neon. Each puzzle is a sector of the flux core, oscillating out of tune.",
+    "Phase II: Drift. The grid remembers. Patterns echo. The core hesitates—and then follows.",
+    "Phase III: Converge. Resistance falls away. You move and the lattice moves with you.",
+    "Phase IV: Lock. Alignment nears 100%. The flux core stops flickering. Stabilization is inevitable."
+  ];
+
+  function computePhase(index) {
+    // 1–128 → Phase I | 129–256 → II | 257–384 → III | 385–512 → IV
+    if (index <= 128) return 1;
+    if (index <= 256) return 2;
+    if (index <= 384) return 3;
+    return 4;
+  }
+
+  function setNarrativePhase(phase) {
+    narrativeEl.textContent = lore[phase - 1];
+  }
+
+  function updateHUD() {
+    hudPhase.textContent = ["I","II","III","IV"][state.phase - 1];
+    hudPuzzle.textContent = `${state.puzzleIndex} / ${state.maxPuzzles}`;
+    hudMoves.textContent = state.moves;
+    hudFlux.textContent = `${Math.floor((state.puzzleIndex - 1) / state.maxPuzzles * 100)}%`;
+  }
+
+  function gridIndex(x, y, size) {
+    return y * size + x;
+  }
+
+  function makeGrid(size, fill = 0) {
+    return Array(size * size).fill(fill);
+  }
+
+  function neighbors(x, y, size) {
+    const list = [[x,y],[x-1,y],[x+1,y],[x,y-1],[x,y+1]];
+    return list.filter(([nx, ny]) => nx >= 0 && nx < size && ny >= 0 && ny < size);
+  }
+
+  function toggleAt(grid, x, y, size, weight = 1) {
+    const ns = neighbors(x, y, size);
+    for (const [nx, ny] of ns) {
+      const i = gridIndex(nx, ny, size);
+      grid[i] = (grid[i] + weight) % 2; // binary flip
+    }
+  }
+
+  function clone(arr) { return arr.slice(); }
+
+  function computeMatch(grid, target) {
+    let same = 0;
+    for (let i = 0; i < grid.length; i++) {
+      if (grid[i] === target[i]) same++;
+    }
+    return Math.floor(same / grid.length * 100);
+  }
+
+  function applyMatchBar(pct) {
+    matchFill.style.width = pct + "%";
+    matchLabel.textContent = pct + "%";
+  }
+
+  // Generates a target configuration and a scrambled start based on the puzzle index and phase
+  function generatePuzzle(puzzleIndex, size) {
+    const phase = computePhase(puzzleIndex);
+    const baseSeed = (puzzleIndex * 928371 + phase * 7777 + size * 1331) >>> 0;
+    const rand = rng(baseSeed);
+
+    // Target: start with random pattern, then smooth by toggling some neighbor patterns to create solvable tendencies
+    const target = makeGrid(size, 0);
+    for (let i = 0; i < size * size; i++) {
+      target[i] = rand() < 0.5 ? 0 : 1;
+    }
+    // Smooth target by applying a few neighbor toggles with lower probability to avoid chaotic noise
+    const smoothOps = phase * 2 + Math.floor(size / 2);
+    for (let k = 0; k < smoothOps; k++) {
+      const x = Math.floor(rand() * size);
+      const y = Math.floor(rand() * size);
+      toggleAt(target, x, y, size, 1);
+    }
+
+    // Start grid: derive from target with a controlled scramble
+    const grid = clone(target);
+    const scrambleMoves = 6 + phase * 3 + Math.floor(size / 2);
+    for (let s = 0; s < scrambleMoves; s++) {
+      const x = Math.floor(rand() * size);
+      const y = Math.floor(rand() * size);
+      toggleAt(grid, x, y, size, 1);
+    }
+
+    // Optional: impose parity constraints to ensure solvability heuristics (not strictly necessary here)
+    return { grid, target, phase };
+  }
+
+  function renderGrid(size, grid) {
+    gridEl.style.gridTemplateColumns = `repeat(${size}, 52px)`;
+    gridEl.innerHTML = "";
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const i = gridIndex(x, y, size);
+        const cell = document.createElement('div');
+        cell.className = "cell " + (grid[i] ? "on" : "off");
+        cell.dataset.x = x;
+        cell.dataset.y = y;
+        cell.addEventListener('click', () => {
+          onCellClick(x, y);
+        });
+        gridEl.appendChild(cell);
+      }
+    }
+  }
+
+  function refreshCells() {
+    const size = state.gridSize;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const i = gridIndex(x, y, size);
+        const cell = gridEl.children[i];
+        cell.className = "cell " + (state.grid[i] ? "on" : "off");
+      }
+    }
+  }
+
+  function onCellClick(x, y) {
+    toggleAt(state.grid, x, y, state.gridSize, 1);
+    state.moves++;
+    hudMoves.textContent = state.moves;
+    refreshCells();
+    const match = computeMatch(state.grid, state.target);
+    applyMatchBar(match);
+
+    if (match === 100) {
+      advancePuzzleAuto();
+    }
+  }
+
+  function loadPuzzle(index) {
+    state.puzzleIndex = Math.max(1, Math.min(state.maxPuzzles, index));
+    state.phase = computePhase(state.puzzleIndex);
+    setNarrativePhase(state.phase);
+    const gen = generatePuzzle(state.puzzleIndex, state.gridSize);
+    state.grid = gen.grid;
+    state.target = gen.target;
+    state.moves = 0;
+    updateHUD();
+    renderGrid(state.gridSize, state.grid);
+    const match = computeMatch(state.grid, state.target);
+    applyMatchBar(match);
+    if (state.puzzleIndex === state.maxPuzzles) {
+      // Prime the endgame after completion
+    }
+  }
+
+  function resetPuzzle() {
+    // Reload same puzzle with fresh scramble using same seed but different phase factor
+    const gen = generatePuzzle(state.puzzleIndex, state.gridSize);
+    state.grid = gen.grid;
+    state.target = gen.target;
+    state.moves = 0;
+    updateHUD();
+    refreshCells();
+    const match = computeMatch(state.grid, state.target);
+    applyMatchBar(match);
+  }
+
+  function advancePuzzleAuto() {
+    // Visual flash to celebrate
+    gridEl.style.boxShadow = "0 0 32px rgba(138,255,0,0.35) inset";
+    setTimeout(() => { gridEl.style.boxShadow = "0 0 24px rgba(0,247,255,0.12) inset"; }, 400);
+    // Move forward
+    if (state.puzzleIndex < state.maxPuzzles) {
+      loadPuzzle(state.puzzleIndex + 1);
+    } else {
+      openEndgame();
+    }
+  }
+
+  function prevPuzzle() {
+    loadPuzzle(state.puzzleIndex - 1);
+  }
+  function nextPuzzle() {
+    loadPuzzle(state.puzzleIndex + 1);
+  }
+
+  function setGridSize(size) {
+    state.gridSize = size;
+    loadPuzzle(state.puzzleIndex);
+  }
+
+  function hint() {
+    // Heuristic hint: pick a cell that maximizes match increase when toggled
+    const size = state.gridSize;
+    let best = { delta: -Infinity, x: 0, y: 0 };
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const backup = clone(state.grid);
+        toggleAt(state.grid, x, y, size, 1);
+        const score = computeMatch(state.grid, state.target);
+        const delta = score - computeMatch(backup, state.target);
+        if (delta > best.delta) {
+          best = { delta, x, y };
+        }
+        state.grid = backup;
+      }
+    }
+    // Visual pulse highlight
+    const i = gridIndex(best.x, best.y, size);
+    const cell = gridEl.children[i];
+    cell.style.boxShadow = "0 0 16px rgba(255,0,230,0.55)";
+    setTimeout(() => { cell.style.boxShadow = ""; }, 600);
+  }
+
+  function openEndgame() {
+    endgameModal.classList.add('open');
+  }
+
+  function stabilizeFlux() {
+    // Quick progression jump if player wants to trigger endgame after last sector aligned
+    if (state.puzzleIndex >= state.maxPuzzles) {
+      openEndgame();
+    } else {
+      // Nudge forward by 4 puzzles as a 'stabilization burst'
+      loadPuzzle(Math.min(state.maxPuzzles, state.puzzleIndex + 4));
+    }
+  }
+
+  function bindUI() {
+    document.getElementById('btn-prev').addEventListener('click', prevPuzzle);
+    document.getElementById('btn-next').addEventListener('click', nextPuzzle);
+    document.getElementById('btn-reset').addEventListener('click', resetPuzzle);
+    document.getElementById('btn-stabilize').addEventListener('click', stabilizeFlux);
+    document.getElementById('btn-size-5').addEventListener('click', () => setGridSize(5));
+    document.getElementById('btn-size-6').addEventListener('click', () => setGridSize(6));
+    document.getElementById('btn-size-7').addEventListener('click', () => setGridSize(7));
+    document.getElementById('btn-hint').addEventListener('click', hint);
+  }
+
+  function init() {
+    bindUI();
+    loadPuzzle(1);
+  }
+
+  return { init };
+})();
+
+document.addEventListener('DOMContentLoaded', Game.init);
+/* === PART 2: Expanded Lore, Variants, and Codex === */
+
+// Extended flavor texts for each puzzle index
+const flavorTexts = [];
+for (let i = 1; i <= 512; i++) {
+  let phase = computePhase(i);
+  let text = "";
+  if (phase === 1) {
+    text = `Sector ${i}: The lattice flickers like a broken neon tube. Stabilize the hum.`;
+  } else if (phase === 2) {
+    text = `Sector ${i}: Echoes of past moves ripple here. The grid remembers your touch.`;
+  } else if (phase === 3) {
+    text = `Sector ${i}: The lattice resists less now. Each toggle feels like destiny.`;
+  } else {
+    text = `Sector ${i}: The flux core is almost whole. One more alignment and the city breathes.`;
+  }
+  flavorTexts.push(text);
+}
+
+// Override loadPuzzle to inject flavor text
+const oldLoadPuzzle = Game.init;
+Game.loadPuzzle = function(index) {
+  state.puzzleIndex = Math.max(1, Math.min(state.maxPuzzles, index));
+  state.phase = computePhase(state.puzzleIndex);
+  setNarrativePhase(state.phase);
+  const gen = generatePuzzle(state.puzzleIndex, state.gridSize);
+  state.grid = gen.grid;
+  state.target = gen.target;
+  state.moves = 0;
+  updateHUD();
+  renderGrid(state.gridSize, state.grid);
+  const match = computeMatch(state.grid, state.target);
+  applyMatchBar(match);
+  // Add flavor text
+  narrativeEl.textContent = flavorTexts[state.puzzleIndex - 1];
+  if (state.puzzleIndex === state.maxPuzzles) {
+    // Prime endgame
+  }
+};
+
+// === Puzzle Variants ===
+function toggleAtVariant(grid, x, y, size, variant) {
+  if (variant === "diagonal") {
+    const list = [[x,y],[x-1,y-1],[x+1,y-1],[x-1,y+1],[x+1,y+1]];
+    for (const [nx, ny] of list) {
+      if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
+        const i = gridIndex(nx, ny, size);
+        grid[i] = (grid[i] + 1) % 2;
+      }
+    }
+  } else if (variant === "phase") {
+    // Phase-shift: toggles two steps away
+    const list = [[x,y],[x-2,y],[x+2,y],[x,y-2],[x,y+2]];
+    for (const [nx, ny] of list) {
+      if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
+        const i = gridIndex(nx, ny, size);
+        grid[i] = (grid[i] + 1) % 2;
+      }
+    }
+  } else {
+    toggleAt(grid, x, y, size, 1);
+  }
+}
+
+// === Codex Unlocks ===
+const codex = {
+  64: "Codex Entry: The lattice is not just wires and light. It is memory.",
+  128: "Codex Entry: Phase I complete. The hum becomes a song.",
+  192: "Codex Entry: The grid is alive. It listens.",
+  256: "Codex Entry: Phase II complete. The flux core trembles.",
+  320: "Codex Entry: The lattice bends willingly.",
+  384: "Codex Entry: Phase III complete. The core is nearly whole.",
+  448: "Codex Entry: The final resonance approaches.",
+  512: "Codex Entry: Flux Core Stabilized. The city is safe."
+};
+
+function checkCodexUnlock(index) {
+  if (codex[index]) {
+    alert(codex[index]);
+  }
+}
+
+// Hook into advancePuzzleAuto
+const oldAdvance = advancePuzzleAuto;
+advancePuzzleAuto = function() {
+  if (state.puzzleIndex < state.maxPuzzles) {
+    loadPuzzle(state.puzzleIndex + 1);
+    checkCodexUnlock(state.puzzleIndex);
+  } else {
+    openEndgame();
+  }
+};
+
+</script>
+</body>
+</html>
